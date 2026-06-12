@@ -109,9 +109,42 @@
 
 ---
 
-## Offene Manuelle Schritte (für Alois)
+---
 
-1. **Office-Server PDF-Worker** (192.168.15.10): Scheduled Task einrichten laut K4-Variante a.
-   Details → `SETUP-TODO.md` (wird in B3 erstellt)
-2. **Word-COM AutoLogon**: Testen ob nicht-interaktiv funktioniert. Falls nicht: DCOM-Identity konfigurieren.
-3. **Port-Dokumentation**: 7601 in internen Port-Listen nachtragen.
+## ABSCHLUSSREPORT v6.0.0 (2026-06-12)
+
+### Was läuft
+
+| Service | URL | Status |
+|---|---|---|
+| karriere-agent | http://192.168.15.30:7601/api/health | ✅ aktiv |
+| detail.html | http://192.168.15.30:7601/detail.html | ✅ erreichbar |
+| Haribo Dashboard | http://192.168.15.30:7500 | ✅ aktiv |
+| systemd: karriere-agent | `systemctl --user status karriere-agent` | ✅ running |
+
+### Was sofort nutzbar ist
+
+1. **Neue Bewerbung starten**: Haribo Dashboard → Bewerbungen → Bewerben → „Dashboard-Chat (NEU)"
+   → Öffnet detail.html, startet Claude-Session, streamt Analyse live
+2. **STOPP-Fragen**: Telegram-Ping mit Deep-Link → direkt am Handy antworten
+3. **Dokumente**: Dokumente-Karte in detail.html zeigt MD/DOCX/PDF-Status, Download-Links
+4. **Versand-Gate**: Automatische Checkliste nach Session-Ende + Sammelpack-Button
+
+### Offene Manuelle Schritte (für Alois)
+
+| # | Aufgabe | Wo | Dringlichkeit |
+|---|---|---|---|
+| 1 | **PDF-Worker Scheduled Task** am Office-Server (192.168.15.10) | `SETUP-TODO.md` | Vor ersten PDF-Exporten |
+| 2 | **Word-COM AutoLogon testen** (nicht-interaktiv) | SETUP-TODO.md §1.3 | Vor ersten PDF-Exporten |
+| 3 | **Port 7601** in interne Port-Listen eintragen | Eigene Notiz | Jederzeit |
+
+### Nicht implementiert (außer Scope v6.0.0)
+
+- CV-Diff-Viewer (war B3-Nice-to-have) — kann nachgerüstet werden
+- DOCX-Template-Replacement (läuft via Claude/SKILL.md, kein Server-Side-Code nötig)
+- Filter-Chips in Bewerbungsliste (D2, partiell — "In Bearbeitung" ist drin)
+- Gehaltseinschätzungs- und Firmen-Recherche-Karten in detail.html (Karten sind als HTML vorhanden, Daten kommen vom Agenten via Session-Chat)
+
+### Release
+
+https://github.com/al1505/ALs-Karriere-Agent/releases/tag/v6.0.0
