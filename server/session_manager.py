@@ -182,6 +182,7 @@ def _estimate_progress(question):
 async def _run_session(state: SessionState, initial_prompt: str):
     from claude_code_sdk import ClaudeSDKClient, ClaudeCodeOptions
     from claude_code_sdk.types import AssistantMessage, TextBlock, ResultMessage
+    from claude_code_sdk._errors import ClaudeSDKError
 
     skill_text = _load_skill()
 
@@ -214,8 +215,24 @@ async def _run_session(state: SessionState, initial_prompt: str):
         state.status = "running"
         await state.events.put({"type": "status", "status": "running"})
 
-        async for msg in client.receive_messages():
+        msg_iter = client.receive_messages().__aiter__()
+        while True:
+            try:
+                msg = await msg_iter.__anext__()
+            except StopAsyncIteration:
+                break
+            except ClaudeSDKError as e:
+                err_str = str(e)
+                if "Unknown message type" in err_str or "rate_limit" in err_str.lower():
+                    LOG.debug("Skipping SDK parse error: %s", e)
+                    continue
+                raise
             state.last_event_at = datetime.now(timezone.utc).isoformat()
+
+            # Skip unknown/system event types gracefully
+            if not isinstance(msg, (ResultMessage, AssistantMessage)):
+                LOG.debug("Skipping message type: %s", type(msg).__name__)
+                continue
 
             if isinstance(msg, ResultMessage):
                 state.sdk_session_id = msg.session_id or ""

@@ -6,7 +6,7 @@ Wants=haribo-dashboard.service
 [Service]
 Type=simple
 WorkingDirectory=%h/projects/ALs-Karriere-Agent
-ExecStart=%h/.local/bin/uvicorn server.app:app --host 0.0.0.0 --port 7600 --workers 1
+ExecStart=%h/.local/bin/uvicorn server.app:app --host 0.0.0.0 --port 7601 --workers 1
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONPATH=%h/projects/ALs-Karriere-Agent
