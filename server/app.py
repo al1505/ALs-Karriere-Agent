@@ -13,7 +13,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
 
 from server import session_manager as sm
@@ -96,10 +96,21 @@ def run_migrations():
         LOG.error("Migration error: %s", e)
 
 
+_PUBLIC = Path(__file__).parent.parent / "public"
+
+
 @app.on_event("startup")
 async def startup():
     run_migrations()
-    LOG.info("Karriere-Agent started on port 7600")
+    LOG.info("Karriere-Agent started on port 7601")
+
+
+@app.get("/detail.html")
+async def serve_detail():
+    f = _PUBLIC / "detail.html"
+    if not f.exists():
+        raise HTTPException(status_code=404, detail="detail.html not found")
+    return FileResponse(str(f), media_type="text/html")
 
 
 # ─── Pydantic models ─────────────────────────────────────────────────────────
@@ -131,7 +142,7 @@ class NewApplicationPayload(BaseModel):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "karriere-agent", "port": 7600}
+    return {"status": "ok", "service": "karriere-agent", "port": 7601}
 
 
 # ─── Session API ─────────────────────────────────────────────────────────────
