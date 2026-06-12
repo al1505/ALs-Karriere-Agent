@@ -1,0 +1,19 @@
+[Unit]
+Description=Karriere-Agent (Port 7600) — Claude SDK sessions for Bewerbungs-Dashboard
+After=network.target haribo-dashboard.service
+Wants=haribo-dashboard.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/ALs-Karriere-Agent
+ExecStart=%h/.local/bin/uvicorn server.app:app --host 0.0.0.0 --port 7600 --workers 1
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONPATH=%h/projects/ALs-Karriere-Agent
+Environment=CLAUDE_CODE_ENTRYPOINT=sdk-py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=karriere-agent
+
+[Install]
+WantedBy=default.target
