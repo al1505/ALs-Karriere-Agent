@@ -35,14 +35,35 @@
 
 ---
 
-## BLOCK B2 — Phase 1 Analyse-Flow 🔄 IN ARBEIT
+## BLOCK B2 — Phase 1 Analyse-Flow ✅ ABGESCHLOSSEN (2026-06-12)
 
-### Geplante Änderungen
-- Dashboard (7500): Detailseite mit Chat-Panel, Stepper, Job-Info-Panel
-- Listen-Umbau: Filter-Chips, "In Bearbeitung"-Sektion oben (D1-D3, D11)
-- Commute-Service (D4) — bereits in app.py implementiert
-- DB-Migrationen (D1, D6, D12) — bereits bei Startup angewendet
-- Responsive-Grundgerüst (D13)
+### Ergebnisse
+- `detail.html` (1099 Zeilen): Bewerbungs-Detailseite unter `http://192.168.15.30:7601/detail.html`
+  - SSE-Chat mit Markdown-Rendering (marked.js)
+  - 7-Step-Stepper (Vorab-Check → Abschluss)
+  - STOPP-Flow: Frage-Buttons + Antwort-Injection
+  - Job-Info-Panel mit Commute-Anzeige
+  - Pause/Resume/Cancel-Controls
+  - Posting-Modal und Abbruch-Modal mit Gründen
+- `app.py`: `/detail.html` FileResponse-Route; Port-Labels auf 7601 korrigiert
+- `app.js` (Haribo Dashboard): 11 Patches
+  - `statusColors`/`statusLabels`: +dashboard (emerald), +paused (yellow)
+  - barColors/barLabels/counts: dashboard+paused ergänzt
+  - offen-Filter: dashboard+paused eingeschlossen
+  - Modal: "Dashboard-Chat (NEU)"-Button
+  - `startDashboardSession()`: POST /api/session/start → öffnet detail.html
+  - "In Bearbeitung"-Sektion oben in der Bewerbungsliste
+
+### Abnahme-Test: BESTANDEN ✅
+1. `/api/health` → `{"status":"ok","port":7601}`
+2. `/detail.html` → HTTP 200
+3. Haribo Dashboard → HTTP 200
+4. Haribo-Dashboard: app.js patches korrekt angewendet (11/11 OK)
+
+### Entscheidungen (autonom)
+- **FileResponse statt StaticFiles-Mount**: StaticFiles at "/" überschreibt API-Routen.
+  Fix: Explizite `/detail.html`-Route via FileResponse.
+- **Port-7500-Konflikt**: Service-Restart-Loop hielt Port besetzt. Fix: Explizit `stop` vor `start`.
 
 ---
 
