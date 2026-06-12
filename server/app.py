@@ -636,6 +636,49 @@ async def app_download(app_id: int, filename: str):
                         filename=target.name)
 
 
+# ─── Versand-Gate + Sammelpack (B4) ─────────────────────────────────────────
+
+@app.get("/api/applications/{app_id}/validate-send")
+async def app_validate_send(app_id: int):
+    """Run pre-send validation on the Bewerbung folder."""
+    rows = _get_application_rows(app_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Application not found")
+    app_path = rows.get("application_path", "")
+    if not app_path:
+        return {"ok": False, "checks": [], "error": "application_path not set"}
+    try:
+        import sys as _sys
+        _scripts = Path(__file__).parent.parent / "scripts"
+        if str(_scripts) not in _sys.path:
+            _sys.path.insert(0, str(_scripts))
+        from validate_send import validate
+        return validate(app_path)
+    except Exception as e:
+        return {"ok": False, "error": str(e), "checks": []}
+
+
+@app.post("/api/applications/{app_id}/build-bundle")
+async def app_build_bundle(app_id: int):
+    """Build Bewerbungs-Sammelpack.pdf from all ready PDFs."""
+    rows = _get_application_rows(app_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Application not found")
+    app_path = rows.get("application_path", "")
+    if not app_path:
+        raise HTTPException(status_code=400, detail="application_path not set")
+    try:
+        import sys as _sys
+        _scripts = Path(__file__).parent.parent / "scripts"
+        if str(_scripts) not in _sys.path:
+            _sys.path.insert(0, str(_scripts))
+        from build_bundle import build_bundle
+        result = build_bundle(app_path)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _get_application_rows(app_id: int):

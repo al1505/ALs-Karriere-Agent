@@ -40,6 +40,22 @@
   .chat-msg b,.chat-msg strong { color:#f1f5f9; }
   .chat-msg p { margin:0.25rem 0; }
   mark { background:rgba(253,224,71,.9); color:#0f172a; border-radius:3px; padding:0 2px; }
+  /* D9: Mobile responsiveness */
+  @media (max-width: 767px) {
+    #stepper { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; flex-wrap: nowrap !important; }
+    #stepper > * { flex-shrink: 0; }
+    .question-btn { min-height: 44px; font-size: 0.8rem; }
+    #chat-messages { min-height: 220px; }
+    main { padding: 0.5rem !important; }
+    header { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+  }
+  /* D7: Error banner */
+  #error-banner { display: none; }
+  #error-banner.visible { display: flex; }
+  /* 4K centering */
+  @media (min-width: 2560px) {
+    main { max-width: 2100px; margin: 0 auto; }
+  }
 </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 min-h-screen font-sans">
@@ -63,6 +79,14 @@
     </button>
   </div>
 </header>
+
+<div id="error-banner" class="items-center gap-2 px-4 py-2 bg-red-900/80 border-b border-red-700 text-red-200 text-xs">
+  <span class="material-symbols-outlined" style="font-size:15px">warning</span>
+  <span id="error-banner-msg"></span>
+  <button onclick="document.getElementById('error-banner').classList.remove('visible')" class="ml-auto text-red-300 hover:text-white">
+    <span class="material-symbols-outlined" style="font-size:14px">close</span>
+  </button>
+</div>
 
 <main class="max-w-[1720px] mx-auto p-4">
 
@@ -202,6 +226,22 @@
         </div>
       </div>
 
+      <!-- Versand-Gate -->
+      <div class="card p-4 hidden" id="versand-gate-card">
+        <div class="text-[11px] uppercase tracking-widest t4 mb-2 flex items-center justify-between">
+          Versand-Checkliste
+          <button onclick="runValidation()" class="t4 hover:t2" title="Neu prüfen">
+            <span class="material-symbols-outlined" style="font-size:14px">refresh</span>
+          </button>
+        </div>
+        <div id="versand-checks" class="space-y-1 text-xs mb-3"></div>
+        <button onclick="buildBundle()" id="btn-bundle"
+          class="w-full px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center justify-center gap-1 hidden">
+          <span class="material-symbols-outlined" style="font-size:14px">package_2</span>Sammelpack erstellen
+        </button>
+        <div id="bundle-result" class="hidden mt-2 text-xs text-emerald-300"></div>
+      </div>
+
       <!-- Session info -->
       <div class="card p-4">
         <div class="text-[11px] uppercase tracking-widest t4 mb-2">Session</div>
@@ -294,6 +334,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   sessionId = params.get('session') || null;
 
   renderStepper(0);
+  checkServiceHealth();
 
   if (!applicationId && !sessionId) {
     showError('Keine Bewerbungs-ID angegeben. ?app=<id> oder ?session=<session_id>');
@@ -412,7 +453,7 @@ function onStatus(status) {
   else hideResumePanel();
 
   if (status !== 'waiting') hideQuestionPanel();
-  if (status === 'completed') { appendSystemMsg('✅ Session abgeschlossen.'); loadDocuments(); }
+  if (status === 'completed') { appendSystemMsg('✅ Session abgeschlossen.'); loadDocuments(); setTimeout(runValidation, 1500); }
 
   // Remove placeholder
   const ph = document.getElementById('chat-placeholder');
@@ -693,6 +734,52 @@ async function loadDocuments() {
   }
 }
 
+async function runValidation() {
+  if (!applicationId) return;
+  const card = document.getElementById('versand-gate-card');
+  const checksEl = document.getElementById('versand-checks');
+  const btnBundle = document.getElementById('btn-bundle');
+  card.classList.remove('hidden');
+  checksEl.innerHTML = '<span class="t4">Prüfe…</span>';
+  try {
+    const r = await fetch(`${AGENT_BASE}/api/applications/${applicationId}/validate-send`);
+    const d = await r.json();
+    checksEl.innerHTML = (d.checks || []).map(c => {
+      const sym = c.ok === true ? '✅' : c.ok === null ? '⏳' : '❌';
+      const col = c.ok === true ? 'text-emerald-300' : c.ok === null ? 'text-yellow-300' : 'text-red-300';
+      return `<div class="flex items-start gap-1.5"><span>${sym}</span><span class="${col} flex-1">${esc(c.name)}</span><span class="t4 text-[10px]">${esc(c.msg||'')}</span></div>`;
+    }).join('') || '<span class="t4">Keine Ergebnisse</span>';
+    btnBundle.classList.toggle('hidden', !d.ok);
+  } catch(e) {
+    checksEl.innerHTML = `<span class="text-red-400">${esc(e.message)}</span>`;
+  }
+}
+
+async function buildBundle() {
+  if (!applicationId) return;
+  const btn = document.getElementById('btn-bundle');
+  const result = document.getElementById('bundle-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined spin" style="font-size:14px">progress_activity</span> Erstelle…';
+  try {
+    const r = await fetch(`${AGENT_BASE}/api/applications/${applicationId}/build-bundle`, {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      result.textContent = `✅ ${d.pages} Seiten · ${Math.round(d.size/1024)} KB → ${d.bundle.split('/').pop()}`;
+      result.classList.remove('hidden');
+      loadDocuments();
+    } else {
+      result.textContent = '❌ ' + (d.error || 'Fehler');
+      result.classList.remove('hidden');
+    }
+  } catch(e) {
+    result.textContent = '❌ ' + e.message;
+    result.classList.remove('hidden');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px">package_2</span>Sammelpack erstellen';
+}
+
 async function queuePdf(docxName) {
   try {
     const r = await fetch(`${AGENT_BASE}/api/applications/${applicationId}/pdf-convert`, {
@@ -720,10 +807,33 @@ async function showPostingModal() {
 }
 
 /* ── Utils ── */
+function showBanner(msg) {
+  const b = document.getElementById('error-banner');
+  document.getElementById('error-banner-msg').textContent = msg;
+  b.classList.add('visible');
+}
+
 function showError(msg) {
   const ph = document.getElementById('chat-placeholder');
   if (ph) ph.innerHTML = `<span class="material-symbols-outlined text-red-400 block mx-auto mb-2" style="font-size:28px">error</span><span class="t4 text-xs">${esc(msg)}</span>`;
   setStatus('error', msg);
+  showBanner(msg);
+}
+
+async function checkServiceHealth() {
+  try {
+    const r = await fetch(`${AGENT_BASE}/api/health`, {signal: AbortSignal.timeout(4000)});
+    if (!r.ok) showBanner('Karriere-Agent antwortet nicht (HTTP ' + r.status + ')');
+  } catch(e) {
+    showBanner('Karriere-Agent nicht erreichbar — Sessions können nicht gestartet werden');
+  }
+  try {
+    const r2 = await fetch(`${AGENT_BASE}/api/pdf-worker/status`, {signal: AbortSignal.timeout(4000)});
+    if (r2.ok) {
+      const d = await r2.json();
+      if (!d.online) showBanner('Office-Server (PDF-Worker) offline — PDF-Konvertierung nicht verfügbar');
+    }
+  } catch(e) { /* non-critical */ }
 }
 
 function setStatus(s, label) {

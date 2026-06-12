@@ -90,7 +90,22 @@
 
 ---
 
-## BLOCK B4 — Abschluss + Release v6.0.0 ⏳ OFFEN
+## BLOCK B4 — Abschluss + Release v6.0.0 ✅ ABGESCHLOSSEN (2026-06-12)
+
+### Ergebnisse
+
+**Phase 3 — Abschluss-Flow:**
+- `scripts/validate_send.py`: Pre-send-Validierung (DOCX-ZIP-Check, PDF-Header, FM-Felder, Platzhalter-Check)
+- `scripts/build_bundle.py`: pypdf-Sammelpack (Anschreiben + CV + Anlagen → Bewerbungs-Sammelpack.pdf)
+- `server/app.py`: `/validate-send` + `/build-bundle` Endpoints
+- `public/detail.html`: Versand-Checkliste-Karte mit Status-Badges + Sammelpack-Button
+
+**Phase 4 — Polish & Härtung:**
+- D7 Error-States: Error-Banner (sichtbar bei Agent-Unreachable, Office-Worker offline)
+- D8 Security: systemd bindet an `192.168.15.30:7601` (LAN-only, kein 0.0.0.0)
+- D9 Mobile: Stepper horizontal scrollable, touch-friendly buttons, 4K-Zentrierung
+- D10 Haribo-Sync: haribo.md — `bewerben`-Action prüft jetzt `dashboard`/`paused`-Status vor PL-Spawn (Doppel-Lauf-Schutz)
+- checkServiceHealth() beim Page-Load (Banner bei Agent/Worker-Ausfall)
 
 ---
 
