@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
 
 from server import session_manager as sm
+from server import document_pipeline as dp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -553,6 +554,86 @@ async def pdf_worker_status():
     except Exception:
         online = False
     return {"office_server": office_server, "online": online, "method": "queue"}
+
+
+# ─── Document Pipeline API (B3) ─────────────────────────────────────────────
+
+@app.get("/api/applications/{app_id}/documents")
+async def app_documents(app_id: int):
+    """List all documents for an application with pipeline status."""
+    rows = _get_application_rows(app_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Application not found")
+    app_path = rows.get("application_path", "")
+    if not app_path:
+        return {"documents": [], "pdf_statuses": {}}
+    docs = dp.get_documents(app_path)
+    pdf_statuses = dp.get_all_pdf_statuses(app_path)
+    return {"documents": docs, "pdf_statuses": pdf_statuses}
+
+
+@app.post("/api/applications/{app_id}/pdf-convert")
+async def app_pdf_convert(app_id: int, payload: dict):
+    """Queue a DOCX → PDF conversion job for the Office Server."""
+    docx_filename = payload.get("docx_filename", "")
+    if not docx_filename:
+        raise HTTPException(status_code=400, detail="docx_filename required")
+    rows = _get_application_rows(app_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Application not found")
+    app_path = rows.get("application_path", "")
+    if not app_path:
+        raise HTTPException(status_code=400, detail="application_path not set")
+    try:
+        result = dp.queue_pdf_job(app_path, docx_filename)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/applications/{app_id}/pdf-status")
+async def app_pdf_status(app_id: int, docx_filename: str = ""):
+    """Check PDF conversion status for a DOCX file (or all if omitted)."""
+    rows = _get_application_rows(app_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Application not found")
+    app_path = rows.get("application_path", "")
+    if not app_path:
+        return {"statuses": {}}
+    if docx_filename:
+        return dp.get_pdf_status(app_path, docx_filename)
+    return {"statuses": dp.get_all_pdf_statuses(app_path)}
+
+
+@app.get("/api/applications/{app_id}/download/{filename:path}")
+async def app_download(app_id: int, filename: str):
+    """Download a document file from the application folder."""
+    rows = _get_application_rows(app_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Application not found")
+    app_path = rows.get("application_path", "")
+    if not app_path:
+        raise HTTPException(status_code=404, detail="application_path not set")
+
+    # Prevent path traversal
+    root = Path(app_path).resolve()
+    target = (root / filename).resolve()
+    if not str(target).startswith(str(root)):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    media_map = {
+        ".md": "text/markdown",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".pdf": "application/pdf",
+        ".txt": "text/plain",
+    }
+    media_type = media_map.get(target.suffix.lower(), "application/octet-stream")
+    return FileResponse(str(target), media_type=media_type,
+                        filename=target.name)
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────

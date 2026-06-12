@@ -154,6 +154,46 @@ def _log_session_event(application_id, session_id, event_type, data):
 
 
 QUESTION_RE = re.compile(r"QUESTION:(\{.*\})\s*$", re.MULTILINE)
+_TELEGRAM_ENV = Path.home() / ".config" / "haribo" / "telegram.env"
+
+
+def _load_telegram_creds() -> tuple[str, str]:
+    token, chat_id = "", ""
+    if _TELEGRAM_ENV.exists():
+        for line in _TELEGRAM_ENV.read_text().splitlines():
+            if line.startswith("TELEGRAM_BOT_TOKEN="):
+                token = line.split("=", 1)[1].strip()
+            elif line.startswith("TELEGRAM_USER_CHAT_ID="):
+                chat_id = line.split("=", 1)[1].strip()
+    return token, chat_id
+
+
+def _send_telegram_stopp_ping(application_id: int, question: dict, session_id: str):
+    """Non-blocking Telegram ping when Claude asks a STOPP question."""
+    try:
+        import urllib.request as _req
+
+        token, chat_id = _load_telegram_creds()
+        if not token or not chat_id:
+            return
+
+        q_text = question.get("question", "Frage")[:120]
+        opts = question.get("options", [])
+        opts_str = " | ".join(o.get("label", "") for o in opts[:4])
+        detail_url = f"http://192.168.15.30:7601/detail.html?app={application_id}&session={session_id}"
+        msg = (
+            f"⏸️ Karriere-Agent wartet auf Entscheidung\n\n"
+            f"❓ {q_text}\n"
+            f"Optionen: {opts_str}\n\n"
+            f"\U0001f517 {detail_url}"
+        )
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        data = json.dumps({"chat_id": chat_id, "text": msg}).encode("utf-8")
+        r = _req.Request(url, data=data,
+                         headers={"Content-Type": "application/json"}, method="POST")
+        _req.urlopen(r, timeout=8)
+    except Exception as e:
+        LOG.debug("Telegram STOPP ping failed (non-critical): %s", e)
 
 
 def _extract_questions(text):
@@ -263,6 +303,7 @@ async def _run_session(state: SessionState, initial_prompt: str):
                     )
                     await state.events.put({"type": "question", **q})
                     _log_session_event(state.application_id, state.session_id, "question", json.dumps(q))
+                    _send_telegram_stopp_ping(state.application_id, q, state.session_id)
 
                     answer = await state.answer_queue.get()
 

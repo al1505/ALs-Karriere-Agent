@@ -189,6 +189,19 @@
         <div id="salary-content" class="text-xs space-y-1.5"></div>
       </div>
 
+      <!-- Dokumente -->
+      <div class="card p-4" id="docs-card">
+        <div class="text-[11px] uppercase tracking-widest t4 mb-2 flex items-center justify-between">
+          Dokumente
+          <button onclick="loadDocuments()" class="t4 hover:t2" title="Aktualisieren">
+            <span class="material-symbols-outlined" style="font-size:14px">refresh</span>
+          </button>
+        </div>
+        <div id="docs-list" class="space-y-1.5 text-xs">
+          <span class="t4">Noch keine Dokumente</span>
+        </div>
+      </div>
+
       <!-- Session info -->
       <div class="card p-4">
         <div class="text-[11px] uppercase tracking-widest t4 mb-2">Session</div>
@@ -309,6 +322,7 @@ async function startNewSession(appId) {
     history.replaceState({}, '', `?app=${appId}&session=${sessionId}`);
     document.getElementById('meta-sid').textContent = sessionId.slice(0, 8) + '…';
     loadJobInfo(appId);
+    loadDocuments();
     openSSE(sessionId);
   } catch(e) {
     showError('Session konnte nicht gestartet werden: ' + e.message);
@@ -328,6 +342,7 @@ async function connectToSession(sid) {
     applicationId = d.application_id;
     document.getElementById('meta-sid').textContent = sid.slice(0,8) + '…';
     loadJobInfo(applicationId);
+    loadDocuments();
     if (d.status === 'paused') showResumePanel();
     else if (d.status === 'waiting' && d.current_question) renderQuestion(d.current_question);
     openSSE(sid);
@@ -397,7 +412,7 @@ function onStatus(status) {
   else hideResumePanel();
 
   if (status !== 'waiting') hideQuestionPanel();
-  if (status === 'completed') appendSystemMsg('✅ Session abgeschlossen.');
+  if (status === 'completed') { appendSystemMsg('✅ Session abgeschlossen.'); loadDocuments(); }
 
   // Remove placeholder
   const ph = document.getElementById('chat-placeholder');
@@ -635,6 +650,58 @@ async function loadCommute(appId, location) {
       const pendel = document.getElementById('ji-pendel');
       pendel.textContent = 'Pendel-Einschätzung: ' + d.pendel;
       pendel.classList.remove('hidden');
+    }
+  } catch(e) {}
+}
+
+async function loadDocuments() {
+  if (!applicationId) return;
+  const el = document.getElementById('docs-list');
+  try {
+    const r = await fetch(`${AGENT_BASE}/api/applications/${applicationId}/documents`);
+    if (!r.ok) { el.innerHTML = '<span class="t4">Fehler beim Laden</span>'; return; }
+    const { documents, pdf_statuses } = await r.json();
+    if (!documents || !documents.length) { el.innerHTML = '<span class="t4">Noch keine Dokumente</span>'; return; }
+
+    const iconMap = { markdown: 'description', docx: 'article', pdf: 'picture_as_pdf' };
+    const colorMap = { markdown: 'text-sky-400', docx: 'text-indigo-400', pdf: 'text-red-400' };
+    const statusBadge = (s) => {
+      if (s === 'ready') return '<span class="px-1 py-0.5 rounded text-[9px] bg-emerald-900/50 text-emerald-300">✓</span>';
+      if (s === 'pending') return '<span class="px-1 py-0.5 rounded text-[9px] bg-yellow-900/50 text-yellow-300 animate-pulse">⏳</span>';
+      if (s === 'missing') return '<span class="px-1 py-0.5 rounded text-[9px] bg-slate-700 text-slate-400">—</span>';
+      return '';
+    };
+
+    el.innerHTML = documents.map(d => {
+      const icon = iconMap[d.type] || 'attach_file';
+      const color = colorMap[d.type] || 't3';
+      const badge = statusBadge(d.status);
+      const downloadLink = d.status === 'ready' && d.path
+        ? `<a href="${AGENT_BASE}/api/applications/${applicationId}/download/${encodeURIComponent(d.name)}" target="_blank" class="t4 hover:t2 ml-auto" title="Herunterladen"><span class="material-symbols-outlined" style="font-size:12px">download</span></a>`
+        : '';
+      const pdfConvertBtn = (d.type === 'docx' && d.status === 'ready')
+        ? `<button onclick="queuePdf('${esc(d.name)}')" class="t4 hover:text-red-300 ml-1" title="PDF erzeugen"><span class="material-symbols-outlined" style="font-size:12px">picture_as_pdf</span></button>`
+        : '';
+      return `<div class="flex items-center gap-1.5">
+        <span class="material-symbols-outlined ${color}" style="font-size:14px">${icon}</span>
+        <span class="truncate t2 flex-1 max-w-[130px]" title="${esc(d.name)}">${esc(d.name)}</span>
+        ${badge}${downloadLink}${pdfConvertBtn}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<span class="t4">Fehler</span>';
+  }
+}
+
+async function queuePdf(docxName) {
+  try {
+    const r = await fetch(`${AGENT_BASE}/api/applications/${applicationId}/pdf-convert`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({docx_filename: docxName})
+    });
+    if (r.ok) {
+      setTimeout(loadDocuments, 1000);
     }
   } catch(e) {}
 }

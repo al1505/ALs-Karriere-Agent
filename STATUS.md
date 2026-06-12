@@ -67,7 +67,26 @@
 
 ---
 
-## BLOCK B3 — Phase 2 Dokumente ⏳ OFFEN
+## BLOCK B3 — Phase 2 Dokumente ✅ ABGESCHLOSSEN (2026-06-12)
+
+### Ergebnisse
+- `server/document_pipeline.py`: Dokument-Tracking, PDF-Job-Queue, Status-API
+  - `get_documents(bw_path)` → MD/DOCX/PDF-Liste mit Status (ready/missing/pending)
+  - `queue_pdf_job()` → schreibt `job.json` in `.pdf-jobs/` für Office-Server-Pickup
+  - `get_pdf_status()` / `get_all_pdf_statuses()` → Konvertierungsstatus
+- `server/app.py`: 4 neue Endpoints
+  - `GET /api/applications/{id}/documents`
+  - `POST /api/applications/{id}/pdf-convert`
+  - `GET /api/applications/{id}/pdf-status`
+  - `GET /api/applications/{id}/download/{filename}` (Path-Traversal-Schutz)
+- `public/detail.html`: Dokumente-Karte mit Status-Badges, Download-Links, PDF-Button
+- `server/session_manager.py`: Telegram STOPP-Ping (direkt via Bot-API, liest token aus telegram.env)
+- `SETUP-TODO.md`: PowerShell-Script + Scheduled-Task-Anleitung für Office-Server
+
+### Offene manuelle Schritte (→ SETUP-TODO.md)
+- Scheduled Task am Office-Server 192.168.15.10 einrichten
+- pdf_worker.ps1 anlegen
+- DCOM-Identity testen
 
 ---
 
